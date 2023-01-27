@@ -94,7 +94,7 @@ student@login04:~/hw1-starter/build> sbatch job-blocked
 Submitted batch job 9637622
 ```
 
-The job is now submitted to Cori's job queue.
+The job is now submitted to Perlmutter's job queue.
 We can now check on the status of our submitted job using a few different commands.
 
 ```
