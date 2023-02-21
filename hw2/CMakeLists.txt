@@ -7,12 +7,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 find_package(OpenMP REQUIRED)
 
 # Group number
-set(GROUP_NAME "None" CACHE STRING "Your group name as it appears on bCourses (no spaces)")
+set(GROUP_NO 00 CACHE STRING "Your group number (two digits)")
 
 # Packaging system
-if (NOT ${GROUP_NAME} STREQUAL None)
+if (NOT ${GROUP_NO} STREQUAL 00)
     set(CPACK_GENERATOR TGZ)
-    set(CPACK_PACKAGE_FILE_NAME "cs267${GROUP_NAME}_hw2")
+    set(CPACK_PACKAGE_FILE_NAME "CS5220Group${GROUP_NO}_hw2")
     install(FILES serial.cpp openmp.cpp DESTINATION .)
     install(FILES ${CPACK_PACKAGE_FILE_NAME}.pdf DESTINATION .)
     include(CPack)
