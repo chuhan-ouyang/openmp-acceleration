@@ -97,18 +97,29 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
 
     // put particles into bins
     for (int i = 0; i < num_parts; ++i) {
+        parts[i].ax = 0;
+        parts[i].ay = 0;
         int col = parts[i].x / cutoff;
         int row = parts[i].y / cutoff;
         int bin = col + row * numRows;
         bins[bin].push_back(&parts[i]);
     }
 
+    // for all bins, each particle only apply forces (in pairs) on neighbors with greater index
+    for (int i = 0; i < totalBins; i++)
+    {
+        for (int j = 0; j < bins[i].size(); j++)
+        {
+            for (int k = j + 1; k < bins[i].size(); k++)
+            {
+                apply_force_pairs(*bins[i][j], *bins[i][k]);
+            }
+        }
+    }
     
     // for each particle, only apply force onto it for particles in the 4 bins around it
     for (int i = 0; i < num_parts; ++i)
     {
-        parts[i].ax = parts[i].ay = 0; 
-
         int col = parts[i].x / cutoff;  
         int row = parts[i].y / cutoff; 
         int binNum = col + row * numRows;
@@ -118,24 +129,13 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         bool hasTop = row - 1 >= 0;
         bool hasBottom = row + 1 < numRows;
 
-        //cout << "1" << endl;
-        // current bin
-        // TODO: consider pairs reduction in current bin
-        for (int j = 0; j < bins[binNum].size(); ++j)
-        {
-            if (j > i)
-            {
-                apply_force(parts[i], *bins[binNum][j]);
-            }
-        }
-
         // bin to the right 
         //cout << "3" << endl;
         if (hasRight)
         {
             for (int j = 0; j < bins[binNum + 1].size(); ++j)
             {
-                apply_force(parts[i], *bins[binNum + 1][j]);
+                apply_force_pairs(parts[i], *bins[binNum + 1][j]);
             }
         }
 
@@ -145,7 +145,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
             // bin directly below
             for (int j = 0; j < bins[binNum + numRows].size(); ++j)
             {
-                apply_force(parts[i], *bins[binNum + numRows][j]);
+                apply_force_pairs(parts[i], *bins[binNum + numRows][j]);
             }
 
             //cout << "8" << endl;
@@ -153,7 +153,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
             {
                 for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
                 {
-                    apply_force(parts[i], *bins[binNum + numRows - 1][j]);
+                    apply_force_pairs(parts[i], *bins[binNum + numRows - 1][j]);
                 }
             }
             
@@ -163,7 +163,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
             {
                 for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
                 {
-                    apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+                    apply_force_pairs(parts[i], *bins[binNum + numRows + 1][j]);
                 }
             }
         }
