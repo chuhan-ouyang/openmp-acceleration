@@ -1,6 +1,7 @@
 #include "common.h"
 #include <cmath>
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -56,15 +57,17 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
 	// You can use this space to initialize static, global data objects
     // that you may need. This function will be called once before the
     // algorithm begins. Do not do any particle simulation here
-
+    //cout << "total size: " << size << endl;
+    //cout << "cutoff: " << cutoff << endl;
     // calculate the sizes for bins base on size and cutoff
     numRows = (size / cutoff) + 1;
     totalBins = numRows * numRows;
+    //cout << "numRows: " << numRows << endl;
+    //cout << "totalBins: " << totalBins << endl;
     bins = new bin_t[totalBins];
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
-
     // clear each bins
     for (int i = 0; i < totalBins; ++i) {
         bins[i].clear();
@@ -78,6 +81,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         bins[bin].push_back(&parts[i]);
     }
 
+    
     // for each particle, only apply force onto it for particles in the 9 neighboring bins
     for (int i = 0; i < num_parts; ++i)
     {
@@ -92,6 +96,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         bool hasTop = row - 1 >= 0;
         bool hasBottom = row + 1 < numRows;
 
+        //cout << "1" << endl;
         // current bin
         for (int j = 0; j < bins[binNum].size(); ++j)
         {
@@ -100,6 +105,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         }
 
         // bins in the rows above
+        //cout << "2" << endl;
         if (hasLeft)
         {
             for (int j = 0; j < bins[binNum - 1].size(); ++j)
@@ -109,6 +115,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         }
 
         // bin to the right 
+        //cout << "3" << endl;
         if (hasRight)
         {
             for (int j = 0; j < bins[binNum + 1].size(); ++j)
@@ -120,11 +127,13 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         // bin above
         if (hasTop)
         {
+            //cout << "4" << endl;
             for (int j = 0; j < bins[binNum - numRows].size(); ++j)
             {
                 apply_force(parts[i], *bins[binNum - numRows][j]);
             }
             
+            //cout << "5" << endl;
             if (hasLeft)
             {
                 for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
@@ -133,6 +142,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
                 }
             }
 
+            //cout << "6" << endl;
             if (hasRight)
             {
                 for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
@@ -145,22 +155,30 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
 
         if (hasBottom)
         {
+            //cout << "7" << endl;
             // bin directly below
             for (int j = 0; j < bins[binNum + numRows].size(); ++j)
             {
                 apply_force(parts[i], *bins[binNum + numRows][j]);
             }
 
-            // bin directly below to the left
-            for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
+            //cout << "8" << endl;
+            if (hasLeft)
             {
-                apply_force(parts[i], *bins[binNum + numRows - 1][j]);
+                for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum + numRows - 1][j]);
+                }
             }
-
-            // bin directly below to the right
-            for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
+            
+            // bin directly below to the left
+            //cout << "9" << endl;
+            if (hasRight)
             {
-                apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+                for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+                }
             }
         }
     }
