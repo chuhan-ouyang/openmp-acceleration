@@ -31,6 +31,28 @@ void apply_force(particle_t& particle, particle_t& neighbor) {
     particle.ay += coef * dy;
 }
 
+// Apply force in pairs
+void apply_force_pairs(particle_t& particle, particle_t& neighbor) {
+    // Calculate Distance
+    double dx = neighbor.x - particle.x;
+    double dy = neighbor.y - particle.y;
+    double r2 = dx * dx + dy * dy;
+
+    // Check if the two particles should interact
+    if (r2 > cutoff * cutoff)
+        return;
+
+    r2 = fmax(r2, min_r * min_r);
+    double r = sqrt(r2);
+
+    // Very simple short-range repulsive force
+    double coef = (1 - cutoff / r) / r2 / mass;
+    particle.ax += coef * dx;
+    particle.ay += coef * dy;
+    neighbor.ax += coef * (-dx);
+    neighbor.ay += coef * (-dy);
+}
+
 // Integrate the ODE
 void move(particle_t& p, double size) {
     // Slightly simplified Velocity Verlet integration
@@ -82,7 +104,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
     }
 
     
-    // for each particle, only apply force onto it for particles in the 9 neighboring bins
+    // for each particle, only apply force onto it for particles in the 4 bins around it
     for (int i = 0; i < num_parts; ++i)
     {
         parts[i].ax = parts[i].ay = 0; 
@@ -98,19 +120,12 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
 
         //cout << "1" << endl;
         // current bin
+        // TODO: consider pairs reduction in current bin
         for (int j = 0; j < bins[binNum].size(); ++j)
         {
-            apply_force(parts[i], *bins[binNum][j]);
-        
-        }
-
-        // bins in the rows above
-        //cout << "2" << endl;
-        if (hasLeft)
-        {
-            for (int j = 0; j < bins[binNum - 1].size(); ++j)
+            if (j > i)
             {
-                apply_force(parts[i], *bins[binNum - 1][j]);
+                apply_force(parts[i], *bins[binNum][j]);
             }
         }
 
@@ -123,35 +138,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
                 apply_force(parts[i], *bins[binNum + 1][j]);
             }
         }
-
-        // bin above
-        if (hasTop)
-        {
-            //cout << "4" << endl;
-            for (int j = 0; j < bins[binNum - numRows].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum - numRows][j]);
-            }
-            
-            //cout << "5" << endl;
-            if (hasLeft)
-            {
-                for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows - 1][j]);
-                }
-            }
-
-            //cout << "6" << endl;
-            if (hasRight)
-            {
-                for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows + 1][j]);
-                }
-            }
-        }
-
 
         if (hasBottom)
         {
