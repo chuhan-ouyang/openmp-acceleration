@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 #include <iostream>
+#include <omp.h>
 
 using namespace std;
 
@@ -10,6 +11,7 @@ typedef vector<particle_t*> bin_t;
 bin_t* bins;
 int numRows;
 int totalBins;
+omp_lock_t lck;
 
 // Apply the force from neighbor to particle
 void apply_force(particle_t& particle, particle_t& neighbor) {
@@ -60,25 +62,34 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     numRows = (size / cutoff) + 1;
     totalBins = numRows * numRows;
     bins = new bin_t[totalBins];
+    omp_init_lock (&lck);
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
+
     #pragma omp master
     {
-            // clear each bins
+        // clear each bins
         for (int i = 0; i < totalBins; ++i) {
             bins[i].clear();
         }
+    
 
-        // put particles into bins
-        for (int i = 0; i < num_parts; ++i) {
-            int col = parts[i].x / cutoff;
-            int row = parts[i].y / cutoff;
-            int bin = col + row * numRows;
+
+    
+    for (int i = 0; i < num_parts; ++i) 
+    {
+        int col = parts[i].x / cutoff;
+        int row = parts[i].y / cutoff;
+        int bin = col + row * numRows;
+        #pragma omp critical
+        {
             bins[bin].push_back(&parts[i]);
         }
+    }
 
-        
+
+    
         // for each particle, only apply force onto it for particles in the 9 neighboring bins
         for (int i = 0; i < num_parts; ++i)
         {
