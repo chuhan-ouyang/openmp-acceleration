@@ -5,7 +5,6 @@
 
 using namespace std;
 
-// define bins as an array of vector<particle_t*>
 typedef vector<particle_t*> bin_t;
 bin_t* bins;
 int numRows;
@@ -79,13 +78,8 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
 	// You can use this space to initialize static, global data objects
     // that you may need. This function will be called once before the
     // algorithm begins. Do not do any particle simulation here
-    //cout << "total size: " << size << endl;
-    //cout << "cutoff: " << cutoff << endl;
-    // calculate the sizes for bins base on size and cutoff
     numRows = (size / cutoff) + 1;
     totalBins = numRows * numRows;
-    //cout << "numRows: " << numRows << endl;
-    //cout << "totalBins: " << totalBins << endl;
     bins = new bin_t[totalBins];
 }
 
