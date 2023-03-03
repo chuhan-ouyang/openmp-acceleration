@@ -1,18 +1,17 @@
 #include "common.h"
 #include <cmath>
-#include <unordered_map>
 #include <vector>
-#include <map>
 
 using namespace std;
 
-// global hashmap: mapping a particle to a row/col consudensed array
-map<vector<int>, vector<particle_t>> bins;
-vector<vector<int>> dirs;
+// define bins as an array of vector<particle_t*>
+typedef vector<particle_t*> bin_t;
+bin_t* bins;
+int numRows;
+int totalBins;
 
 // Apply the force from neighbor to particle
 void apply_force(particle_t& particle, particle_t& neighbor) {
-    // apply force on each other?
     // Calculate Distance
     double dx = neighbor.x - particle.x;
     double dy = neighbor.y - particle.y;
@@ -58,61 +57,126 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     // that you may need. This function will be called once before the
     // algorithm begins. Do not do any particle simulation here
 
-    // for all particles, compute their row and col bin, add to hashmap
-    for (int i = 0; i < num_parts; i++)
-    {
-        particle_t p = parts[i];
-        int row = p.x / cutoff;
-        int col = p.y / cutoff;
-        bins[{row, col}].push_back(p);
-    }
-    
-    dirs = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
+    // calculate the sizes for bins base on size and cutoff
+    numRows = (size / cutoff) + 1;
+    totalBins = numRows * numRows;
+    bins = new bin_t[totalBins];
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
-    // Compute Forces
 
-    // for each particle, get the row and column
-    // for all 9 in dirs, compute the new row and col, and then look through all in that bin
-    for (int i = 0; i < num_parts; i++)
-    {
-        particle_t p = parts[i];
-        int row = p.x / cutoff;
-        int col = p.y / cutoff;
-        bins[{row, col}].push_back(p);
+    // clear each bins
+    for (int i = 0; i < totalBins; ++i) {
+        bins[i].clear();
     }
 
+    // put particles into bins
     for (int i = 0; i < num_parts; ++i) {
-        parts[i].ax = parts[i].ay = 0;
-        for (int j = 0; j < num_parts; ++j) {
-            apply_force(parts[i], parts[j]);
-        }
+        int col = parts[i].x / cutoff;
+        int row = parts[i].y / cutoff;
+        int bin = col + row * numRows;
+        bins[bin].push_back(&parts[i]);
     }
 
-
-    for (int i = 0; i < num_parts; i++)
+    // for each particle, only apply force onto it for particles in the 9 neighboring bins
+    for (int i = 0; i < num_parts; ++i)
     {
-        vector<particle_t> neighbors;
-        particle_t p = parts[i];
-        int row = p.x / cutoff;
-        int col = p.y / cutoff;
-        parts[i].ax = parts[i].ay = 0;
-        for (int j = 0; j < dirs.size(); j++)
+        parts[i].ax = parts[i].ay = 0; 
+
+        int col = parts[i].x / cutoff;  
+        int row = parts[i].y / cutoff; 
+        int binNum = col + row * numRows;
+
+        bool hasLeft = col - 1 >= 0;
+        bool hasRight = col + 1 < numRows;
+        bool hasTop = row - 1 >= 0;
+        bool hasBottom = row + 1 < numRows;
+
+        // current bin
+        for (int j = 0; j < bins[binNum].size(); ++j)
         {
-            int new_row = row + dirs[j][0];
-            int new_col = col + dirs[j][1];
-            for (int k = 0; k < bins[{new_row, new_col}].size(); k++)
+            apply_force(parts[i], *bins[binNum][j]);
+        
+        }
+
+        // bins in the rows above
+        if (hasLeft)
+        {
+            for (int j = 0; j < bins[binNum - 1].size(); ++j)
             {
-                neighbors.push_back(bins[{new_row, new_col}][k]);
+                apply_force(parts[i], *bins[binNum - 1][j]);
             }
         }
-        for (int j = 0; j < neighbors.size(); j++)
+
+        // bin to the right 
+        if (hasRight)
         {
-            apply_force(parts[i], neighbors[j]);
+            for (int j = 0; j < bins[binNum + 1].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum + 1][j]);
+            }
+        }
+
+        // bin above
+        if (hasTop)
+        {
+            for (int j = 0; j < bins[binNum - numRows].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum - numRows][j]);
+            }
+            
+            if (hasLeft)
+            {
+                for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum - numRows - 1][j]);
+                }
+            }
+
+            if (hasRight)
+            {
+                for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum - numRows + 1][j]);
+                }
+            }
+        }
+
+
+        if (hasBottom)
+        {
+            // bin directly below
+            for (int j = 0; j < bins[binNum + numRows].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum + numRows][j]);
+            }
+
+            // bin directly below to the left
+            for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum + numRows - 1][j]);
+            }
+
+            // bin directly below to the right
+            for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+            }
         }
     }
 
+
+    // to clera previous, go to each vector (in the array element), and call vector.clear()
+    // after computing the forces for this bin, immediately clear the bin
+    // // Compute Forces
+    // for (int i = 0; i < num_parts; ++i) {
+    //     parts[i].ax = parts[i].ay = 0;
+    //     for (int j = 0; j < num_parts; ++j) {
+    //         apply_force(parts[i], parts[j]);
+    //     }
+    // }
+
+    // Move Particles
     for (int i = 0; i < num_parts; ++i) {
         move(parts[i], size);
     }
