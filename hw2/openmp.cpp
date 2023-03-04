@@ -7,14 +7,14 @@
 using namespace std;
 
 // define bins as an array of vector<particle_t*>
-typedef vector<particle_t*> bin_t;
+typedef vector<pair<particle_t*, int>> bin_t;
 bin_t* bins;
 int numRows;
 int totalBins;
 omp_lock_t* lckArray;
-omp_lock_t write_lock;
+omp_lock_t* particlesLckArray;
 
-void apply_force_pairs(particle_t& particle, particle_t& neighbor) {
+void apply_force_pairs(particle_t& particle, particle_t& neighbor, int particleIndex, int neighborIndex) {
     // Calculate Distance
     double dx = neighbor.x - particle.x;
     double dy = neighbor.y - particle.y;
@@ -29,12 +29,15 @@ void apply_force_pairs(particle_t& particle, particle_t& neighbor) {
 
     // Very simple short-range repulsive force
     double coef = (1 - cutoff / r) / r2 / mass;
-    omp_set_lock(&(write_lock));
+    omp_set_lock(&(particlesLckArray[particleIndex]));
     particle.ax += coef * dx;
     particle.ay += coef * dy;
+    omp_unset_lock(&(particlesLckArray[particleIndex]));
+
+    omp_set_lock(&(particlesLckArray[neighborIndex]));
     neighbor.ax += coef * (-dx);
     neighbor.ay += coef * (-dy);
-    omp_unset_lock(&(write_lock));
+    omp_unset_lock(&(particlesLckArray[neighborIndex]));
 }
 
 // Apply the force from neighbor to particle
@@ -87,12 +90,17 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     totalBins = numRows * numRows;
     bins = new bin_t[totalBins];
     lckArray = new omp_lock_t[totalBins];
+    particlesLckArray = new omp_lock_t[num_parts];
 
-    for (int i = 0; i < totalBins; i++)
+    for (int i = 0; i < totalBins; ++i)
     {
         omp_init_lock(&lckArray[i]);
     }
-    omp_init_lock(&write_lock);
+
+    for (int i = 0; i < num_parts; ++i)
+    {
+        omp_init_lock(&particlesLckArray[i]);
+    }
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
@@ -110,7 +118,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         parts[i].ax = parts[i].ay = 0; 
         int bin = col + row * numRows;
         omp_set_lock(&(lckArray[bin]));
-        bins[bin].push_back(&parts[i]);
+        bins[bin].push_back({&parts[i], i});
         omp_unset_lock(&(lckArray[bin]));
     }
 
@@ -121,7 +129,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         {
             for (int k = j + 1; k < bins[i].size(); k++)
             {
-                apply_force_pairs(*bins[i][j], *bins[i][k]);
+                apply_force_pairs(*bins[i][j].first, *bins[i][k].first, bins[i][j].second, bins[i][k].second);
             }
         }
     }
@@ -145,7 +153,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         {
             for (int j = 0; j < bins[binNum + 1].size(); ++j)
             {
-                apply_force_pairs(parts[i], *bins[binNum + 1][j]);
+                apply_force_pairs(parts[i], *bins[binNum + 1][j].first, i, bins[binNum + 1][j].second);
             }
         }
 
@@ -155,7 +163,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
             // bin directly below
             for (int j = 0; j < bins[binNum + numRows].size(); ++j)
             {
-                apply_force_pairs(parts[i], *bins[binNum + numRows][j]);
+                apply_force_pairs(parts[i], *bins[binNum + numRows][j].first, i, bins[binNum + numRows][j].second);
             }
 
             //cout << "8" << endl;
@@ -163,7 +171,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
             {
                 for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
                 {
-                    apply_force_pairs(parts[i], *bins[binNum + numRows - 1][j]);
+                    apply_force_pairs(parts[i], *bins[binNum + numRows - 1][j].first, i, bins[binNum + numRows - 1][j].second);
                 }
             }
             
@@ -173,7 +181,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
             {
                 for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
                 {
-                    apply_force_pairs(parts[i], *bins[binNum + numRows + 1][j]);
+                    apply_force_pairs(parts[i], *bins[binNum + numRows + 1][j].first, i, bins[binNum + numRows + 1][j].second);
                 }
             }
         }
