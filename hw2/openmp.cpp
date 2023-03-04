@@ -12,6 +12,7 @@ bin_t* bins;
 int numRows;
 int totalBins;
 omp_lock_t* lckArray;
+vector<vector<int>> dirs;
 
 // Apply the force from neighbor to particle
 void apply_force(particle_t& particle, particle_t& neighbor) {
@@ -68,6 +69,8 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     {
         omp_init_lock(&lckArray[i]);
     }
+
+    dirs = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
@@ -83,99 +86,28 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         int col = parts[i].x / cutoff;
         int row = parts[i].y / cutoff;
         int bin = col + row * numRows;
+        parts[i].ax = parts[i].ay = 0;
         omp_set_lock(&(lckArray[bin]));
         bins[bin].push_back(&parts[i]);
         omp_unset_lock(&(lckArray[bin]));
     }
-
-    #pragma omp for
-    // for each particle, only apply force onto it for particles in the 9 neighboring bins
-    for (int i = 0; i < num_parts; ++i)
+ 
+    #pragma omp for collapse(3)
+    for (int r = 0; r < numRows; ++r)
     {
-        parts[i].ax = parts[i].ay = 0; 
-
-        int col = parts[i].x / cutoff;  
-        int row = parts[i].y / cutoff; 
-        int binNum = col + row * numRows;
-
-        bool hasLeft = col - 1 >= 0;
-        bool hasRight = col + 1 < numRows;
-        bool hasTop = row - 1 >= 0;
-        bool hasBottom = row + 1 < numRows;
-
-        // current bin
-        for (int j = 0; j < bins[binNum].size(); ++j)
+        for (int c = 0; c < numRows; ++c)
         {
-            apply_force(parts[i], *bins[binNum][j]);
-        
-        }
-
-        // bins in the rows above
-        if (hasLeft)
-        {
-            for (int j = 0; j < bins[binNum - 1].size(); ++j)
+            for (int j = 0; j < dirs.size(); j++)
             {
-                apply_force(parts[i], *bins[binNum - 1][j]);
-            }
-        }
-
-        // bin to the right 
-        if (hasRight)
-        {
-            for (int j = 0; j < bins[binNum + 1].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum + 1][j]);
-            }
-        }
-
-        // bin above
-        if (hasTop)
-        {
-            for (int j = 0; j < bins[binNum - numRows].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum - numRows][j]);
-            }
-            
-            if (hasLeft)
-            {
-                for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows - 1][j]);
-                }
-            }
-
-            if (hasRight)
-            {
-                for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows + 1][j]);
-                }
-            }
-        }
-
-
-        if (hasBottom)
-        {
-            // bin directly below
-            for (int j = 0; j < bins[binNum + numRows].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum + numRows][j]);
-            }
-
-            if (hasLeft)
-            {
-                for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum + numRows - 1][j]);
-                }
-            }
-            
-            // bin directly below to the left
-            if (hasRight)
-            {
-                for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+                if (0 <= (r + dirs[j][0]) && (r + dirs[j][0]) < numRows && 0 <= (c + dirs[j][1]) && (c + dirs[j][1]) < numRows)
+                {   
+                    for (int i = 0; i < bins[(r * numRows + c)].size(); ++i)
+                    {
+                        for (int k = 0; k < bins[(r + dirs[j][0]) * numRows + (c + dirs[j][1])].size(); ++k)
+                        {
+                            apply_force(*bins[r * numRows + c][i], *bins[(r + dirs[j][0]) * numRows + (c + dirs[j][1])][k]);
+                        }
+                    }
                 }
             }
         }
