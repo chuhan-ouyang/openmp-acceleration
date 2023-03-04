@@ -11,7 +11,7 @@ typedef vector<particle_t*> bin_t;
 bin_t* bins;
 int numRows;
 int totalBins;
-omp_lock_t lck;
+omp_lock_t* lckArray;
 
 // Apply the force from neighbor to particle
 void apply_force(particle_t& particle, particle_t& neighbor) {
@@ -62,7 +62,12 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     numRows = (size / cutoff) + 1;
     totalBins = numRows * numRows;
     bins = new bin_t[totalBins];
-    omp_init_lock (&lck);
+    lckArray = new omp_lock_t[totalBins];
+
+    for (int i = 0; i < totalBins; i++)
+    {
+        omp_init_lock(&lckArray[i]);
+    }
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
@@ -79,9 +84,9 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         int col = parts[i].x / cutoff;
         int row = parts[i].y / cutoff;
         int bin = col + row * numRows;
-        omp_set_lock(&lck);
+        omp_set_lock(&(lckArray[bin]));
         bins[bin].push_back(&parts[i]);
-        omp_unset_lock(&lck);
+        omp_unset_lock(&(lckArray[bin]));
     }
     #pragma omp barrier
 
