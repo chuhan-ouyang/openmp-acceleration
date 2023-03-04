@@ -7,38 +7,11 @@
 using namespace std;
 
 // define bins as an array of vector<particle_t*>
-typedef vector<pair<particle_t*, int>> bin_t;
+typedef vector<particle_t*> bin_t;
 bin_t* bins;
 int numRows;
 int totalBins;
 omp_lock_t* lckArray;
-omp_lock_t* particlesLckArray;
-
-void apply_force_pairs(particle_t& particle, particle_t& neighbor, int particleIndex, int neighborIndex) {
-    // Calculate Distance
-    double dx = neighbor.x - particle.x;
-    double dy = neighbor.y - particle.y;
-    double r2 = dx * dx + dy * dy;
-
-    // Check if the two particles should interact
-    if (r2 > cutoff * cutoff)
-        return;
-
-    r2 = fmax(r2, min_r * min_r);
-    double r = sqrt(r2);
-
-    // Very simple short-range repulsive force
-    double coef = (1 - cutoff / r) / r2 / mass;
-    omp_set_lock(&(particlesLckArray[particleIndex]));
-    particle.ax += coef * dx;
-    particle.ay += coef * dy;
-    omp_unset_lock(&(particlesLckArray[particleIndex]));
-
-    omp_set_lock(&(particlesLckArray[neighborIndex]));
-    neighbor.ax += coef * (-dx);
-    neighbor.ay += coef * (-dy);
-    omp_unset_lock(&(particlesLckArray[neighborIndex]));
-}
 
 // Apply the force from neighbor to particle
 void apply_force(particle_t& particle, particle_t& neighbor) {
@@ -90,16 +63,10 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     totalBins = numRows * numRows;
     bins = new bin_t[totalBins];
     lckArray = new omp_lock_t[totalBins];
-    particlesLckArray = new omp_lock_t[num_parts];
 
-    for (int i = 0; i < totalBins; ++i)
+    for (int i = 0; i < totalBins; i++)
     {
         omp_init_lock(&lckArray[i]);
-    }
-
-    for (int i = 0; i < num_parts; ++i)
-    {
-        omp_init_lock(&particlesLckArray[i]);
     }
 }
 
@@ -115,10 +82,9 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
     {
         int col = parts[i].x / cutoff;
         int row = parts[i].y / cutoff;
-        parts[i].ax = parts[i].ay = 0; 
         int bin = col + row * numRows;
         omp_set_lock(&(lckArray[bin]));
-        bins[bin].push_back({&parts[i], i});
+        bins[bin].push_back(&parts[i]);
         omp_unset_lock(&(lckArray[bin]));
     }
 
@@ -126,6 +92,7 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
     // for each particle, only apply force onto it for particles in the 9 neighboring bins
     for (int i = 0; i < num_parts; ++i)
     {
+        parts[i].ax = parts[i].ay = 0; 
 
         int col = parts[i].x / cutoff;  
         int row = parts[i].y / cutoff; 
@@ -139,45 +106,76 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         // current bin
         for (int j = 0; j < bins[binNum].size(); ++j)
         {
-            if (bins[binNum][j].second > i)
+            apply_force(parts[i], *bins[binNum][j]);
+        
+        }
+
+        // bins in the rows above
+        if (hasLeft)
+        {
+            for (int j = 0; j < bins[binNum - 1].size(); ++j)
             {
-                apply_force_pairs(parts[i], *bins[binNum][j].first, i, bins[binNum][j].second);
+                apply_force(parts[i], *bins[binNum - 1][j]);
             }
         }
 
+        // bin to the right 
         if (hasRight)
         {
             for (int j = 0; j < bins[binNum + 1].size(); ++j)
             {
-                apply_force_pairs(parts[i], *bins[binNum + 1][j].first, i, bins[binNum + 1][j].second);
+                apply_force(parts[i], *bins[binNum + 1][j]);
             }
         }
 
-       if (hasBottom)
+        // bin above
+        if (hasTop)
         {
-            //cout << "7" << endl;
+            for (int j = 0; j < bins[binNum - numRows].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum - numRows][j]);
+            }
+            
+            if (hasLeft)
+            {
+                for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum - numRows - 1][j]);
+                }
+            }
+
+            if (hasRight)
+            {
+                for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum - numRows + 1][j]);
+                }
+            }
+        }
+
+
+        if (hasBottom)
+        {
             // bin directly below
             for (int j = 0; j < bins[binNum + numRows].size(); ++j)
             {
-                apply_force_pairs(parts[i], *bins[binNum + numRows][j].first, i, bins[binNum + numRows][j].second);
+                apply_force(parts[i], *bins[binNum + numRows][j]);
             }
 
-            //cout << "8" << endl;
             if (hasLeft)
             {
                 for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
                 {
-                    apply_force_pairs(parts[i], *bins[binNum + numRows - 1][j].first, i, bins[binNum + numRows - 1][j].second);
+                    apply_force(parts[i], *bins[binNum + numRows - 1][j]);
                 }
             }
             
             // bin directly below to the left
-            //cout << "9" << endl;
             if (hasRight)
             {
                 for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
                 {
-                    apply_force_pairs(parts[i], *bins[binNum + numRows + 1][j].first, i, bins[binNum + numRows + 1][j].second);
+                    apply_force(parts[i], *bins[binNum + numRows + 1][j]);
                 }
             }
         }
