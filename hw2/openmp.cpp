@@ -123,18 +123,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
     }
 
     #pragma omp for
-    for (int i = 0; i < totalBins; i++)
-    {
-        for (int j = 0; j < bins[i].size(); j++)
-        {
-            for (int k = j + 1; k < bins[i].size(); k++)
-            {
-                apply_force_pairs(*bins[i][j].first, *bins[i][k].first, bins[i][j].second, bins[i][k].second);
-            }
-        }
-    }
-
-    #pragma omp for
     // for each particle, only apply force onto it for particles in the 9 neighboring bins
     for (int i = 0; i < num_parts; ++i)
     {
@@ -149,6 +137,14 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         bool hasBottom = row + 1 < numRows;
 
         // current bin
+        for (int j = 0; j < bins[binNum].size(); ++j)
+        {
+            if (bins[binNum][j].second > i)
+            {
+                apply_force_pairs(parts[i], *bins[binNum][j].first, i, bins[binNum][j].second);
+            }
+        }
+
         if (hasRight)
         {
             for (int j = 0; j < bins[binNum + 1].size(); ++j)
