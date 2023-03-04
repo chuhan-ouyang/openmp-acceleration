@@ -67,10 +67,6 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
 
-    // if (omp_get_thread_num() == 0)
-    // {
-    //     cout << "num threads: " << omp_get_num_threads() << endl;
-    // }
     #pragma omp for
     for (int i = 0; i < totalBins; ++i) {
         bins[i].clear();
@@ -83,13 +79,12 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         int col = parts[i].x / cutoff;
         int row = parts[i].y / cutoff;
         int bin = col + row * numRows;
-        #pragma omp critical
-        {
-            bins[bin].push_back(&parts[i]);
-        }
+        omp_set_lock(&lck);
+        bins[bin].push_back(&parts[i]);
+        omp_unset_lock(&lck);
     }
-
     #pragma omp barrier
+
     #pragma omp for
     // for each particle, only apply force onto it for particles in the 9 neighboring bins
     for (int i = 0; i < num_parts; ++i)
