@@ -10,6 +10,7 @@ typedef vector<particle_t*> bin_t;
 bin_t* bins;
 int numRows;
 int totalBins;
+vector<vector<int>> dirs;
 
 // Apply the force from neighbor to particle
 void apply_force(particle_t& particle, particle_t& neighbor) {
@@ -65,6 +66,7 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
     //cout << "numRows: " << numRows << endl;
     //cout << "totalBins: " << totalBins << endl;
     bins = new bin_t[totalBins];
+    dirs = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
 }
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
@@ -75,126 +77,35 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
 
     // put particles into bins
     for (int i = 0; i < num_parts; ++i) {
+        parts[i].ax = parts[i].ay = 0;
         int col = parts[i].x / cutoff;
         int row = parts[i].y / cutoff;
         int bin = col + row * numRows;
         bins[bin].push_back(&parts[i]);
     }
 
-    
-    // for each particle, only apply force onto it for particles in the 9 neighboring bins
-    for (int i = 0; i < num_parts; ++i)
+
+    for (int r = 0; r < numRows; ++r)
     {
-        parts[i].ax = parts[i].ay = 0; 
-
-        int col = parts[i].x / cutoff;  
-        int row = parts[i].y / cutoff; 
-        int binNum = col + row * numRows;
-
-        bool hasLeft = col - 1 >= 0;
-        bool hasRight = col + 1 < numRows;
-        bool hasTop = row - 1 >= 0;
-        bool hasBottom = row + 1 < numRows;
-
-        //cout << "1" << endl;
-        // current bin
-        for (int j = 0; j < bins[binNum].size(); ++j)
+        for (int c = 0; c < numRows; ++c)
         {
-            apply_force(parts[i], *bins[binNum][j]);
-        
-        }
-
-        // bins in the rows above
-        //cout << "2" << endl;
-        if (hasLeft)
-        {
-            for (int j = 0; j < bins[binNum - 1].size(); ++j)
+            for (int j = 0; j < dirs.size(); j++)
             {
-                apply_force(parts[i], *bins[binNum - 1][j]);
-            }
-        }
-
-        // bin to the right 
-        //cout << "3" << endl;
-        if (hasRight)
-        {
-            for (int j = 0; j < bins[binNum + 1].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum + 1][j]);
-            }
-        }
-
-        // bin above
-        if (hasTop)
-        {
-            //cout << "4" << endl;
-            for (int j = 0; j < bins[binNum - numRows].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum - numRows][j]);
-            }
-            
-            //cout << "5" << endl;
-            if (hasLeft)
-            {
-                for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows - 1][j]);
-                }
-            }
-
-            //cout << "6" << endl;
-            if (hasRight)
-            {
-                for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows + 1][j]);
-                }
-            }
-        }
-
-
-        if (hasBottom)
-        {
-            //cout << "7" << endl;
-            // bin directly below
-            for (int j = 0; j < bins[binNum + numRows].size(); ++j)
-            {
-                apply_force(parts[i], *bins[binNum + numRows][j]);
-            }
-
-            //cout << "8" << endl;
-            if (hasLeft)
-            {
-                for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum + numRows - 1][j]);
-                }
-            }
-            
-            // bin directly below to the left
-            //cout << "9" << endl;
-            if (hasRight)
-            {
-                for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+                // for each potential bins
+                if (0 <= (r + dirs[j][0]) && (r + dirs[j][0]) < numRows && 0 <= (c + dirs[j][1]) && (c + dirs[j][1]) < numRows)
+                {   
+                    for (int i = 0; i < bins[(r * numRows + c)].size(); ++i)
+                    {
+                        for (int k = 0; k < bins[(r + dirs[j][0]) * numRows + (c + dirs[j][1])].size(); ++k)
+                        {
+                            apply_force(*bins[r * numRows + c][i], *bins[(r + dirs[j][0]) * numRows + (c + dirs[j][1])][k]);
+                        }
+                    }
                 }
             }
         }
     }
 
-
-    // to clera previous, go to each vector (in the array element), and call vector.clear()
-    // after computing the forces for this bin, immediately clear the bin
-    // // Compute Forces
-    // for (int i = 0; i < num_parts; ++i) {
-    //     parts[i].ax = parts[i].ay = 0;
-    //     for (int j = 0; j < num_parts; ++j) {
-    //         apply_force(parts[i], parts[j]);
-    //     }
-    // }
-
-    // Move Particles
     for (int i = 0; i < num_parts; ++i) {
         move(parts[i], size);
     }
