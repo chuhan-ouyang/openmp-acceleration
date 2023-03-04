@@ -67,16 +67,17 @@ void init_simulation(particle_t* parts, int num_parts, double size) {
 
 void simulate_one_step(particle_t* parts, int num_parts, double size) {
 
-    #pragma omp master
-    {
-        // clear each bins
-        for (int i = 0; i < totalBins; ++i) {
-            bins[i].clear();
-        }
-    
+    // if (omp_get_thread_num() == 0)
+    // {
+    //     cout << "num threads: " << omp_get_num_threads() << endl;
+    // }
+    #pragma omp for
+    for (int i = 0; i < totalBins; ++i) {
+        bins[i].clear();
+    }
 
-
-    
+    #pragma omp barrier
+    #pragma omp for
     for (int i = 0; i < num_parts; ++i) 
     {
         int col = parts[i].x / cutoff;
@@ -88,103 +89,103 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         }
     }
 
+    #pragma omp barrier
+    #pragma omp for
+    // for each particle, only apply force onto it for particles in the 9 neighboring bins
+    for (int i = 0; i < num_parts; ++i)
+    {
+        parts[i].ax = parts[i].ay = 0; 
 
-    
-        // for each particle, only apply force onto it for particles in the 9 neighboring bins
-        for (int i = 0; i < num_parts; ++i)
+        int col = parts[i].x / cutoff;  
+        int row = parts[i].y / cutoff; 
+        int binNum = col + row * numRows;
+
+        bool hasLeft = col - 1 >= 0;
+        bool hasRight = col + 1 < numRows;
+        bool hasTop = row - 1 >= 0;
+        bool hasBottom = row + 1 < numRows;
+
+        // current bin
+        for (int j = 0; j < bins[binNum].size(); ++j)
         {
-            parts[i].ax = parts[i].ay = 0; 
+            apply_force(parts[i], *bins[binNum][j]);
+        
+        }
 
-            int col = parts[i].x / cutoff;  
-            int row = parts[i].y / cutoff; 
-            int binNum = col + row * numRows;
-
-            bool hasLeft = col - 1 >= 0;
-            bool hasRight = col + 1 < numRows;
-            bool hasTop = row - 1 >= 0;
-            bool hasBottom = row + 1 < numRows;
-
-            // current bin
-            for (int j = 0; j < bins[binNum].size(); ++j)
+        // bins in the rows above
+        if (hasLeft)
+        {
+            for (int j = 0; j < bins[binNum - 1].size(); ++j)
             {
-                apply_force(parts[i], *bins[binNum][j]);
-            
+                apply_force(parts[i], *bins[binNum - 1][j]);
             }
+        }
 
-            // bins in the rows above
+        // bin to the right 
+        if (hasRight)
+        {
+            for (int j = 0; j < bins[binNum + 1].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum + 1][j]);
+            }
+        }
+
+        // bin above
+        if (hasTop)
+        {
+            for (int j = 0; j < bins[binNum - numRows].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum - numRows][j]);
+            }
+            
             if (hasLeft)
             {
-                for (int j = 0; j < bins[binNum - 1].size(); ++j)
+                for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
                 {
-                    apply_force(parts[i], *bins[binNum - 1][j]);
+                    apply_force(parts[i], *bins[binNum - numRows - 1][j]);
                 }
             }
 
-            // bin to the right 
             if (hasRight)
             {
-                for (int j = 0; j < bins[binNum + 1].size(); ++j)
+                for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
                 {
-                    apply_force(parts[i], *bins[binNum + 1][j]);
-                }
-            }
-
-            // bin above
-            if (hasTop)
-            {
-                for (int j = 0; j < bins[binNum - numRows].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum - numRows][j]);
-                }
-                
-                if (hasLeft)
-                {
-                    for (int j = 0; j < bins[binNum - numRows - 1].size(); ++j)
-                    {
-                        apply_force(parts[i], *bins[binNum - numRows - 1][j]);
-                    }
-                }
-
-                if (hasRight)
-                {
-                    for (int j = 0; j < bins[binNum - numRows + 1].size(); ++j)
-                    {
-                        apply_force(parts[i], *bins[binNum - numRows + 1][j]);
-                    }
-                }
-            }
-
-
-            if (hasBottom)
-            {
-                // bin directly below
-                for (int j = 0; j < bins[binNum + numRows].size(); ++j)
-                {
-                    apply_force(parts[i], *bins[binNum + numRows][j]);
-                }
-
-                if (hasLeft)
-                {
-                    for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
-                    {
-                        apply_force(parts[i], *bins[binNum + numRows - 1][j]);
-                    }
-                }
-                
-                // bin directly below to the left
-                if (hasRight)
-                {
-                    for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
-                    {
-                        apply_force(parts[i], *bins[binNum + numRows + 1][j]);
-                    }
+                    apply_force(parts[i], *bins[binNum - numRows + 1][j]);
                 }
             }
         }
 
-        // Move Particles
-        for (int i = 0; i < num_parts; ++i) {
-            move(parts[i], size);
+
+        if (hasBottom)
+        {
+            // bin directly below
+            for (int j = 0; j < bins[binNum + numRows].size(); ++j)
+            {
+                apply_force(parts[i], *bins[binNum + numRows][j]);
+            }
+
+            if (hasLeft)
+            {
+                for (int j = 0; j < bins[binNum + numRows - 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum + numRows - 1][j]);
+                }
+            }
+            
+            // bin directly below to the left
+            if (hasRight)
+            {
+                for (int j = 0; j < bins[binNum + numRows + 1].size(); ++j)
+                {
+                    apply_force(parts[i], *bins[binNum + numRows + 1][j]);
+                }
+            }
         }
+    }
+
+    #pragma omp for
+    // Move Particles
+    for (int i = 0; i < num_parts; ++i) {
+        move(parts[i], size);
     }
 }
