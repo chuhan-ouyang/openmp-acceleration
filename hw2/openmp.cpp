@@ -77,7 +77,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         bins[i].clear();
     }
 
-    #pragma omp barrier
     #pragma omp for
     for (int i = 0; i < num_parts; ++i) 
     {
@@ -88,7 +87,6 @@ void simulate_one_step(particle_t* parts, int num_parts, double size) {
         bins[bin].push_back(&parts[i]);
         omp_unset_lock(&(lckArray[bin]));
     }
-    #pragma omp barrier
 
     #pragma omp for
     // for each particle, only apply force onto it for particles in the 9 neighboring bins
